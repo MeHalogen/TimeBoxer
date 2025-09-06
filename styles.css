@@ -1,0 +1,122 @@
+/* styles.css
+   Shared styles for TimeBoxer extension (content overlay, progress bars, buttons, etc).
+*/
+
+/* Overlay modal styles */
+#timeboxer-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+}
+
+.timeboxer-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+  padding: 32px 28px 24px 28px;
+  min-width: 320px;
+  max-width: 90vw;
+  text-align: center;
+  position: relative;
+  outline: none;
+}
+
+.timeboxer-title {
+  font-size: 1.5em;
+  color: #4CAF50;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.timeboxer-text {
+  font-size: 1.1em;
+  color: #333;
+  margin-bottom: 18px;
+}
+
+.timeboxer-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.timeboxer-actions button {
+  background: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+.timeboxer-actions button:hover {
+  background: #388E3C;
+}
+
+.timeboxer-close {
+  position: absolute;
+  top: 10px; right: 14px;
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: #aaa;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.timeboxer-close:hover {
+  color: #4CAF50;
+}
+
+.timeboxer-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.18);
+  z-index: -1;
+}
+
+/* Progress bar (shared) */
+.tbx-progress {
+  background: #eee;
+  border-radius: 6px;
+  height: 8px;
+  width: 80px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  position: relative;
+}
+
+.tbx-progress-bar {
+  background: #4CAF50;
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+
+.tbx-progress-label {
+  font-size: 0.9em;
+  color: #333;
+  vertical-align: middle;
+}
+
+/* Error message */
+.tbx-error {
+  color: #d32f2f;
+  font-size: 0.98em;
+  margin-top: 6px;
+}
+
+/* History block */
+.tbx-history-block {
+  margin-bottom: 8px;
+  font-size: 0.98em;
+  color: #555;
+}

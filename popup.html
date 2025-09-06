@@ -1,0 +1,38 @@
+<!-- popup.html
+     TimeBoxer Popup: Quick dashboard showing current sites, usage, and link to options page.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TimeBoxer</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="tbx-popup-container">
+    <header>
+      <h1>TimeBoxer</h1>
+      <a href="options.html" target="_blank" id="addSiteLink" title="Manage sites">+ Add Site</a>
+    </header>
+    <section id="popupSitesSection">
+      <table id="popupSitesTable">
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Used</th>
+            <th>Limit</th>
+            <th>Left</th>
+            <th>Progress</th>
+          </tr>
+        </thead>
+        <tbody id="popupSitesTbody">
+          <!-- Populated by popup.js -->
+        </tbody>
+      </table>
+    </section>
+    <div id="popupEmpty" style="display:none">No sites tracked yet.<br>Use <b>Add Site</b> to get started.</div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

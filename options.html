@@ -1,0 +1,56 @@
+<!-- options.html
+     TimeBoxer Options Dashboard: Manage sites, set limits, view usage, reset, and import/export settings.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TimeBoxer Options</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="tbx-container">
+    <header>
+      <h1>TimeBoxer Dashboard</h1>
+      <button id="exportBtn" title="Export settings">Export</button>
+      <button id="importBtn" title="Import settings">Import</button>
+      <button id="globalResetBtn" title="Reset all usage">Global Reset</button>
+    </header>
+    <section id="add-site-section">
+      <h2>Add Site</h2>
+      <form id="addSiteForm">
+    <input type="text" id="domainInput" placeholder="Domain (e.g. youtube.com)" required pattern="^[a-zA-Z0-9.\-]+$" autocomplete="off">
+        <input type="number" id="minutesInput" placeholder="Minutes/day" min="1" max="1440" required>
+        <button type="submit">Add</button>
+      </form>
+      <div id="addSiteError" class="tbx-error"></div>
+    </section>
+    <section id="sites-section">
+      <h2>Tracked Sites</h2>
+      <table id="sitesTable">
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Used</th>
+            <th>Limit</th>
+            <th>Progress</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sitesTbody">
+          <!-- Populated by options.js -->
+        </tbody>
+      </table>
+    </section>
+    <section id="history-section">
+      <h2>Usage History (last 7 days)</h2>
+      <div id="historyList">
+        <!-- Populated by options.js -->
+      </div>
+    </section>
+    <input type="file" id="importFileInput" accept=".json" style="display:none">
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

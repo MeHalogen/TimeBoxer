@@ -1,0 +1,71 @@
+/* TimeBoxer Options Page Styles */
+.tb-container {
+  max-width: 600px;
+  margin: 2em auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0001;
+  padding: 2em;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+#addSiteForm {
+  display: flex;
+  gap: 1em;
+  margin-bottom: 1em;
+}
+#addSiteForm input, #addSiteForm button {
+  font-size: 1em;
+  padding: 0.5em;
+}
+.tb-site {
+  background: #f9f9f9;
+  border-radius: 6px;
+  margin-bottom: 1em;
+  padding: 1em;
+  box-shadow: 0 1px 4px #0001;
+}
+.tb-site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tb-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: #eee;
+  border-radius: 5px;
+  margin: 0.5em 0;
+  overflow: hidden;
+}
+.tb-progress-fill {
+  height: 100%;
+  background: #4CAF50;
+  transition: width 0.3s;
+}
+.tb-site-info {
+  font-size: 0.95em;
+  margin-bottom: 0.5em;
+}
+.tb-site-actions button {
+  margin-right: 0.5em;
+  background: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3em 0.8em;
+  cursor: pointer;
+}
+.tb-site-actions button:hover {
+  background: #4CAF50;
+  color: #fff;
+}
+.tb-snoozed {
+  color: #4CAF50;
+  font-weight: bold;
+  margin-left: 1em;
+}
+.tb-history-day {
+  margin-bottom: 1em;
+  background: #f3f3f3;
+  border-radius: 4px;
+  padding: 0.5em;
+}

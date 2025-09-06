@@ -1,0 +1,92 @@
+/* popup.css
+   Styles for TimeBoxer popup dashboard.
+*/
+
+.tbx-popup-container {
+  min-width: 320px;
+  max-width: 400px;
+  padding: 18px 16px 12px 16px;
+  background: #fff;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+  color: #222;
+}
+
+.tbx-popup-container header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.tbx-popup-container h1 {
+  font-size: 1.3em;
+  margin: 0;
+  color: #4CAF50;
+  font-weight: 600;
+}
+
+#addSiteLink {
+  background: #4CAF50;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 0.95em;
+  transition: background 0.2s;
+}
+#addSiteLink:hover {
+  background: #388E3C;
+}
+
+#popupSitesTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+
+#popupSitesTable th, #popupSitesTable td {
+  padding: 6px 4px;
+  text-align: left;
+  font-size: 0.98em;
+}
+
+#popupSitesTable th {
+  color: #555;
+  font-weight: 500;
+  border-bottom: 1px solid #eee;
+}
+
+#popupSitesTable td {
+  border-bottom: 1px solid #f3f3f3;
+}
+
+.tbx-progress {
+  background: #eee;
+  border-radius: 6px;
+  height: 8px;
+  width: 80px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  position: relative;
+}
+
+.tbx-progress-bar {
+  background: #4CAF50;
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+
+.tbx-progress-label {
+  font-size: 0.9em;
+  color: #333;
+  vertical-align: middle;
+}
+
+#popupEmpty {
+  text-align: center;
+  color: #888;
+  font-size: 1em;
+  margin-top: 18px;
+}
