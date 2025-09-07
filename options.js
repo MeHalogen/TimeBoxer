@@ -101,7 +101,7 @@ function renderHistoryFromUsageHistory() {
           <tr><th>Domain</th><th>Time Spent</th></tr>
         </thead>
         <tbody>
-          ${entries.map(([domain, info]) => `<tr><td>${domain}</td><td>${formatTime(info.usedSeconds)}</td></tr>`).join('')}
+          ${entries.map(([domain, info]) => `<tr><td>${domain === 'chrome-extensions' ? 'chrome://extensions' : domain}</td><td>${formatTime(info.usedSeconds)}</td></tr>`).join('')}
         </tbody>
       `;
       historyDiv.appendChild(table);
