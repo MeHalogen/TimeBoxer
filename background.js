@@ -2,6 +2,9 @@
 // TimeBoxer Service Worker: Handles timer logic, domain normalization, daily reset, storage updates, and messaging with content/popup/options scripts.
 
 const STORAGE_KEY = 'siteLimits';
+const USAGE_HISTORY_KEY = 'usageHistory';
+let currentHistoryDomain = null;
+let historyLastStart = null;
 
 // Normalize domain: strips www. and returns hostname
 function normalizeDomain(url) {
@@ -34,7 +37,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
               lastStart: null,
               isActive: false,
               snoozedUntil: null,
-              history: []
+              history: [],
+              snoozeCount: 0
             }
           }
         });
@@ -184,198 +188,234 @@ function checkOverlay(tabId, url) {
   });
 }
 
-// Tab activated: pause previous, activate new if tracked
+// Usage history tracking
+// Periodically flush history timer every 10 seconds
+chrome.alarms.create('historyFlush', { periodInMinutes: 1/6 }); // every 10 seconds
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'historyFlush') {
+    pauseHistoryTimer();
+    // If still on the same domain, restart timer
+    if (currentHistoryDomain) {
+      startHistoryTimer(currentHistoryDomain);
+    }
+  }
+});
+// Flush history timer when tab is closed
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  pauseHistoryTimer();
+});
+
+// Flush history timer when extension is unloaded (service worker is terminated)
+self.addEventListener('unload', () => {
+  pauseHistoryTimer();
+});
+// Only one declaration for usage history tracking variables
+
+function normalizeDomainForHistory(url) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    if (!hostname || hostname === 'null') {
+      console.warn('[TimeBoxer] normalizeDomainForHistory: Invalid hostname derived from URL:', url);
+      return null;
+    }
+    console.log('[TimeBoxer] normalizeDomainForHistory:', url, '->', hostname);
+    return hostname;
+  } catch (e) {
+    console.error('[TimeBoxer] normalizeDomainForHistory ERROR:', url, e);
+    return null;
+  }
+}
+
+function validateDomain(domain) {
+  return domain && domain !== 'null' && domain.trim() !== '';
+}
+
+function startHistoryTimer(domain) {
+  if (!validateDomain(domain)) {
+    console.warn('[TimeBoxer] startHistoryTimer: Skipping invalid domain', domain);
+    return;
+  }
+  chrome.windows.getCurrent({ populate: false }, (win) => {
+    if (!win || !win.focused) {
+      console.warn('[TimeBoxer] startHistoryTimer: Window not focused');
+      return;
+    }
+    currentHistoryDomain = domain;
+    historyLastStart = Date.now();
+    console.log('[TimeBoxer] startHistoryTimer: Timer started for domain:', domain);
+  });
+}
+
+// Ensure usageHistory is updated correctly
+function updateUsageHistory(domain, elapsed) {
+  chrome.storage.sync.get([USAGE_HISTORY_KEY], (data) => {
+    const history = data[USAGE_HISTORY_KEY] || {};
+    if (!history[domain]) {
+      history[domain] = { usedSeconds: 0 };
+    }
+    history[domain].usedSeconds += elapsed;
+    chrome.storage.sync.set({ [USAGE_HISTORY_KEY]: history }, () => {
+      console.log('[TimeBoxer] updateUsageHistory: Updated history for domain:', domain, 'Elapsed seconds:', elapsed);
+    });
+  });
+}
+
+// Update pauseHistoryTimer to use updateUsageHistory
+function pauseHistoryTimer() {
+  if (!validateDomain(currentHistoryDomain) || !historyLastStart) {
+    console.warn('[TimeBoxer] pauseHistoryTimer: Skipping invalid domain', currentHistoryDomain);
+    currentHistoryDomain = null;
+    historyLastStart = null;
+    return;
+  }
+  const elapsed = Math.round((Date.now() - historyLastStart) / 1000);
+  updateUsageHistory(currentHistoryDomain, elapsed);
+  currentHistoryDomain = null;
+  historyLastStart = null;
+}
+
+// Tab activated: pause previous, start new
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  pauseHistoryTimer();
   pauseAllDomains(() => {
     chrome.tabs.get(activeInfo.tabId, (tab) => {
-      if (!tab || !tab.url) return;
-      const domain = normalizeDomain(tab.url);
-      if (!domain) return;
-      currentTabId = activeInfo.tabId;
-      if (currentWindowFocused) activateDomain(domain);
-      checkOverlay(activeInfo.tabId, tab.url);
+      if (!tab || !tab.url || !(tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+        console.warn('[TimeBoxer] Invalid tab URL:', tab?.url);
+        return;
+      }
+      const domain = normalizeDomainForHistory(tab.url);
+      if (!domain) {
+        console.warn('[TimeBoxer] Failed to normalize domain:', tab.url);
+        return;
+      }
+      chrome.windows.get(tab.windowId, {}, (win) => {
+        if (!win || !win.focused) {
+          console.warn('[TimeBoxer] Window not focused:', win);
+          return;
+        }
+        startHistoryTimer(domain);
+        activateDomain(domain);
+      });
     });
   });
 });
 
-// Tab updated: activate if status complete and tab is active
+// Tab updated: start timer if status complete and tab is active
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.active && tab.url) {
-    const domain = normalizeDomain(tab.url);
-    if (!domain) return;
-    if (currentWindowFocused) activateDomain(domain);
-    checkOverlay(tabId, tab.url);
+  if (changeInfo.status === 'complete' && tab.active && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+    pauseHistoryTimer();
+    pauseAllDomains(() => {
+      const domain = normalizeDomainForHistory(tab.url);
+      if (!domain) {
+        console.warn('[TimeBoxer] Failed to normalize domain:', tab.url);
+        return;
+      }
+      chrome.windows.get(tab.windowId, {}, (win) => {
+        if (!win || !win.focused) {
+          console.warn('[TimeBoxer] Window not focused:', win);
+          return;
+        }
+        startHistoryTimer(domain);
+        activateDomain(domain);
+      });
+    });
   }
 });
 
-// Window focus changed: pause all if unfocused, activate if focused
+// Window focus changed: pause if unfocused, start if focused
 chrome.windows.onFocusChanged.addListener((windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    currentWindowFocused = false;
+    pauseHistoryTimer();
     pauseAllDomains();
   } else {
-    currentWindowFocused = true;
-    // Find active tab in focused window
     chrome.windows.get(windowId, { populate: true }, (win) => {
-      if (!win || !win.focused) return;
-      const activeTab = win.tabs.find(t => t.active && t.url);
+      if (!win || !win.focused) {
+        pauseHistoryTimer();
+        pauseAllDomains();
+        return;
+      }
+      const activeTab = win.tabs.find(t => t.active && t.url && (t.url.startsWith('http://') || t.url.startsWith('https://')));
       if (activeTab) {
-        const domain = normalizeDomain(activeTab.url);
-        if (domain) activateDomain(domain);
-        checkOverlay(activeTab.id, activeTab.url);
+        const domain = normalizeDomainForHistory(activeTab.url);
+        if (!domain) return;
+        pauseHistoryTimer();
+        pauseAllDomains(() => {
+          startHistoryTimer(domain);
+          activateDomain(domain);
+        });
       }
     });
   }
 });
 
-// Tab removed: pause all if active tab closed
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-  if (tabId === currentTabId) {
-    pauseAllDomains();
-    currentTabId = null;
-  }
-});
-
-// Message handler: snooze, closeTab, manual reset, export/import
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.action === 'snooze' && msg.domain) {
+// Content script message listener: update limits or snooze
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'updateLimit') {
+    const { domain, limitSeconds } = message;
     chrome.storage.sync.get([STORAGE_KEY], (data) => {
       const limits = data[STORAGE_KEY] || {};
-      const site = limits[msg.domain];
-      if (site) {
-        site.snoozedUntil = Date.now() + 5 * 60 * 1000;
-        site.lastStart = null;
-        site.isActive = false;
+      if (limits[domain]) {
+        limits[domain].limitSeconds = limitSeconds;
         chrome.storage.sync.set({ [STORAGE_KEY]: limits }, () => {
           sendResponse({ success: true });
         });
-      } else sendResponse({ success: false });
+      } else {
+        sendResponse({ success: false, error: 'Domain not found' });
+      }
     });
-    return true;
-  }
-  if (msg.action === 'closeTab' && sender.tab && sender.tab.id) {
-    chrome.tabs.remove(sender.tab.id);
-    sendResponse({ success: true });
-    return true;
-  }
-  if (msg.action === 'manualReset' && msg.domain) {
+    return true; // Async response
+  } else if (message.action === 'snooze') {
+    const { domain, minutes } = message;
     chrome.storage.sync.get([STORAGE_KEY], (data) => {
       const limits = data[STORAGE_KEY] || {};
-      const site = limits[msg.domain];
-      if (site) {
-        site.usedSeconds = 0;
-        site.lastStart = null;
-        site.isActive = false;
-        site.snoozedUntil = null;
+      if (limits[domain]) {
+        limits[domain].snoozedUntil = Date.now() + minutes * 60 * 1000;
         chrome.storage.sync.set({ [STORAGE_KEY]: limits }, () => {
+          // If snoozed from active state, pause the domain
+          if (limits[domain].isActive) {
+            pauseAllDomains();
+          }
           sendResponse({ success: true });
         });
-      } else sendResponse({ success: false });
+      } else {
+        sendResponse({ success: false, error: 'Domain not found' });
+      }
     });
-    return true;
-  }
-  if (msg.action === 'globalReset') {
-    chrome.storage.sync.get([STORAGE_KEY], (data) => {
-      const limits = data[STORAGE_KEY] || {};
-      Object.keys(limits).forEach(domain => {
-        limits[domain].usedSeconds = 0;
-        limits[domain].lastStart = null;
-        limits[domain].isActive = false;
-        limits[domain].snoozedUntil = null;
-      });
-      chrome.storage.sync.set({ [STORAGE_KEY]: limits }, () => {
-        sendResponse({ success: true });
-      });
-    });
-    return true;
-  }
-  if (msg.action === 'exportSettings') {
-    chrome.storage.sync.get([STORAGE_KEY], (data) => {
-      sendResponse({ json: JSON.stringify(data[STORAGE_KEY] || {}, null, 2) });
-    });
-    return true;
-  }
-  if (msg.action === 'importSettings' && msg.json) {
-    let imported;
-    try {
-      imported = JSON.parse(msg.json);
-    } catch (e) {
-      sendResponse({ success: false, error: 'Invalid JSON' });
-      return true;
-    }
-    chrome.storage.sync.set({ [STORAGE_KEY]: imported }, () => {
-      sendResponse({ success: true });
-    });
-    return true;
-  }
-  // For debugging: simulate time
-  if (msg.action === 'simulateTime' && msg.domain && typeof msg.seconds === 'number') {
-    chrome.storage.sync.get([STORAGE_KEY], (data) => {
-      const limits = data[STORAGE_KEY] || {};
-      const site = limits[msg.domain];
-      if (site) {
-        site.usedSeconds += msg.seconds;
-        chrome.storage.sync.set({ [STORAGE_KEY]: limits }, () => {
-          sendResponse({ success: true });
-        });
-      } else sendResponse({ success: false });
-    });
-    return true;
+    return true; // Async response
   }
 });
 
-// Ignore internal pages
-function isInternalUrl(url) {
-  return /^chrome:|^file:|^about:|^edge:|^moz-extension:|^chrome-extension:/.test(url);
-}
-
-// Listen for storage changes to update overlays
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && changes[STORAGE_KEY]) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      tabs.forEach(tab => {
-        if (tab.url && !isInternalUrl(tab.url)) {
-          checkOverlay(tab.id, tab.url);
-        }
-      });
-    });
-  }
-});
-
-// Optional: notify when limit reached (ask user in options/popup to enable)
-function notifyLimit(domain) {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icon128.png',
-    title: "TimeBoxer",
-    message: `You've reached your daily limit for ${domain}.`
-  });
-}
-
-// Realtime alarm: update timer and check overlay every second
+// Realtime check: update overlay every minute
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'realtimeCheck' && currentTabId && currentWindowFocused && activeDomain) {
-    chrome.tabs.get(currentTabId, (tab) => {
-      if (!tab || !tab.url) return;
-      const domain = normalizeDomain(tab.url);
-      if (domain !== activeDomain) return;
-      chrome.storage.sync.get([STORAGE_KEY], (data) => {
-        const limits = data[STORAGE_KEY] || {};
+  if (alarm.name === 'realtimeCheck') {
+    // Only check overlays, do not write timer values to storage
+    chrome.storage.sync.get([STORAGE_KEY], (data) => {
+      const limits = data[STORAGE_KEY] || {};
+      let activeDomainFound = false;
+      Object.keys(limits).forEach(domain => {
         const site = limits[domain];
-        if (site && site.isActive && site.lastStart) {
-          const now = Date.now();
-          const elapsed = Math.round((now - site.lastStart) / 1000);
-          if (elapsed > 0) {
-            site.usedSeconds += elapsed;
-            site.lastStart = now;
-            chrome.storage.sync.set({ [STORAGE_KEY]: limits }, () => {
-              checkOverlay(currentTabId, tab.url);
+        if (site.isActive && site.lastStart) {
+          activeDomainFound = true;
+          // Check if limit exceeded
+          if (site.usedSeconds >= site.limitSeconds && (!site.snoozedUntil || site.snoozedUntil <= Date.now())) {
+            // Limit exceeded, pause domain
+            site.isActive = false;
+            site.lastStart = null;
+            // Only update overlays, do not write to storage here
+            chrome.tabs.query({ url: `*://${domain}/*` }, (tabs) => {
+              tabs.forEach(tab => {
+                checkOverlay(tab.id, tab.url);
+              });
             });
-          } else {
-            checkOverlay(currentTabId, tab.url);
           }
         }
       });
+      // If no active domain found, clear the alarm
+      if (!activeDomainFound) {
+        chrome.alarms.clear('realtimeCheck');
+        realtimeAlarmActive = false;
+      }
     });
   }
 });

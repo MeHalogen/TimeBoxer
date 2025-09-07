@@ -2,6 +2,7 @@
 // TimeBoxer Options Dashboard Logic: Handles site management, limit editing, usage reset, import/export, and real-time UI updates.
 
 const STORAGE_KEY = 'siteLimits';
+const USAGE_HISTORY_KEY = 'usageHistory';
 
 // Utility: Format seconds as HH:MM:SS
 function formatTime(sec) {
@@ -17,6 +18,14 @@ function normalizeDomain(domain) {
   return domain.trim().replace(/^www\./, '').toLowerCase();
 }
 
+// Ensure validateDomain is defined globally
+function validateDomain(domain) {
+  return domain && domain !== 'null' && domain.trim() !== '';
+}
+
+// Attach validateDomain to the global scope
+window.validateDomain = validateDomain;
+
 // Render sites table
 function renderSites(limits) {
   const tbody = document.getElementById('sitesTbody');
@@ -27,10 +36,12 @@ function renderSites(limits) {
     const used = formatTime(site.usedSeconds);
     const limit = formatTime(site.limitSeconds);
     const percent = Math.min(100, Math.round((site.usedSeconds / site.limitSeconds) * 100));
+    const snoozeCount = site.snoozeCount || 0;
     tr.innerHTML = `
       <td>${domain}</td>
       <td>${used}</td>
       <td>${limit}</td>
+      <td><span class="tbx-snooze-count" title="Snoozes">⏰ ${snoozeCount}</span></td>
       <td>
         <div class="tbx-progress">
           <div class="tbx-progress-bar" style="width:${percent}%"></div>
@@ -73,18 +84,29 @@ function renderSites(limits) {
   });
 }
 
-// Render history
-function renderHistory(limits) {
+// Render history from usageHistory
+function renderHistoryFromUsageHistory() {
   const historyDiv = document.getElementById('historyList');
   historyDiv.innerHTML = '';
-  Object.entries(limits).forEach(([domain, site]) => {
-    const hist = site.history || [];
-    if (hist.length) {
-      const div = document.createElement('div');
-      div.className = 'tbx-history-block';
-      div.innerHTML = `<strong>${domain}:</strong> ` +
-        hist.map(h => `${h.date}: ${formatTime(h.usedSeconds)}`).join(', ');
-      historyDiv.appendChild(div);
+  chrome.storage.sync.get([USAGE_HISTORY_KEY], (data) => {
+    const usageHistory = data[USAGE_HISTORY_KEY] || {};
+    const entries = Object.entries(usageHistory).filter(([domain, info]) => {
+      return validateDomain(domain) && info && typeof info.usedSeconds === 'number';
+    });
+    if (entries.length) {
+      const table = document.createElement('table');
+      table.className = 'tbx-history-table';
+      table.innerHTML = `
+        <thead>
+          <tr><th>Domain</th><th>Time Spent</th></tr>
+        </thead>
+        <tbody>
+          ${entries.map(([domain, info]) => `<tr><td>${domain}</td><td>${formatTime(info.usedSeconds)}</td></tr>`).join('')}
+        </tbody>
+      `;
+      historyDiv.appendChild(table);
+    } else {
+      historyDiv.textContent = 'No history yet.';
     }
   });
 }
@@ -168,10 +190,22 @@ function updateUI() {
   chrome.storage.sync.get([STORAGE_KEY], (data) => {
     const limits = data[STORAGE_KEY] || {};
     renderSites(limits);
-    renderHistory(limits);
+    renderHistoryFromUsageHistory();
   });
 }
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && changes[STORAGE_KEY]) updateUI();
+  if (area === 'sync' && (changes[STORAGE_KEY] || changes['usageHistory'])) updateUI();
 });
 document.addEventListener('DOMContentLoaded', updateUI);
+
+// Update table headers
+document.getElementById('sitesTable').querySelector('thead').innerHTML = `
+  <tr>
+    <th>Domain</th>
+    <th>Used</th>
+    <th>Limit</th>
+    <th>Snoozes</th>
+    <th>Progress</th>
+    <th>Actions</th>
+  </tr>
+`;
