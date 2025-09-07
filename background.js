@@ -214,16 +214,14 @@ self.addEventListener('unload', () => {
 
 function normalizeDomainForHistory(url) {
   try {
-    const hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
-    if (!hostname || hostname === 'null') {
-      console.warn('[TimeBoxer] normalizeDomainForHistory: Invalid hostname derived from URL:', url);
-      return null;
+    if (url.startsWith('chrome://')) {
+      return url.replace('chrome://', '').replace(/\//g, '-');
     }
-    console.log('[TimeBoxer] normalizeDomainForHistory:', url, '->', hostname);
-    return hostname;
+    const hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return hostname || url;
   } catch (e) {
     console.error('[TimeBoxer] normalizeDomainForHistory ERROR:', url, e);
-    return null;
+    return null; // Return null for invalid URLs
   }
 }
 
@@ -233,17 +231,14 @@ function validateDomain(domain) {
 
 function startHistoryTimer(domain) {
   if (!validateDomain(domain)) {
-    console.warn('[TimeBoxer] startHistoryTimer: Skipping invalid domain', domain);
     return;
   }
   chrome.windows.getCurrent({ populate: false }, (win) => {
     if (!win || !win.focused) {
-      console.warn('[TimeBoxer] startHistoryTimer: Window not focused');
       return;
     }
     currentHistoryDomain = domain;
     historyLastStart = Date.now();
-    console.log('[TimeBoxer] startHistoryTimer: Timer started for domain:', domain);
   });
 }
 
